@@ -1,0 +1,205 @@
+---
+title:
+output:
+  html_document:
+    css: custom.css
+    toc: yes
+    toc_depth: 2
+    self-contained: no
+---
+
+
+
+```{r setup, include=FALSE}
+library(knitr)
+library(data.table)
+library(ggplot2)
+library(plotly)
+opts_chunk$set(out.width='900px', dpi=200)
+```
+
+#Analysis of 2015 Salaries
+##Salaries by University
+###Individual Salary Distributions
+```{r}
+rawData = read.csv(file.path(getwd(), "Inputs", "Salary Disclosure by year", "Curated Data", "2015", "merged_file.csv"), stringsAsFactors = F)
+rawData[, 4] = as.numeric(gsub("[$,]","", rawData[, 4]))
+rawData[, 5] = as.numeric(gsub("[$,]","", rawData[, 5]))
+rawData$Total.Compensation = rawData$Salary.Paid + rawData$Taxable.Benefits
+rawData_universities = rawData[rawData$Sector == "Universities", ]
+for (i in (1:length(unique(rawData_universities$Employer)))){
+  #print(unique(rawData_universities$Employer)[i])
+  filtered_df = rawData_universities[rawData_universities$Employer == unique(rawData_universities$Employer)[i], ]
+  hist(filtered_df$Salary.Paid, main = paste0("Compensation Distribution for ", unique(rawData_universities$Employer)[i]), xlab = "Total Compensation (Salary + Benefits)")
+}
+```
+
+###Salary spread
+```{r}
+# boxplot(x = rawData_universities$Salary.Paid, data = filtered_df, formula = rawData_universities$Salary.Paid ~ rawData_universities$Employer)
+top_universities = c("University of Toronto", "University of Ottawa", "University of Waterloo", "University of Western Ontario")
+set1 = unique(rawData_universities$Employer)[1:12]
+set2 = unique(rawData_universities$Employer)[13:25]
+set3 = unique(rawData_universities$Employer)[25:55]
+
+# Find the distribution of salaries across schools
+rawData_universities_split_1 = subset(rawData_universities, Employer %in% set1)
+rawData_universities_split_2 = subset(rawData_universities, Employer %in% set2)
+rawData_universities_split_3 = subset(rawData_universities, Employer %in% set3)
+
+boxplot(Salary.Paid ~ Employer, data = rawData_universities, las=2)
+boxplot(Salary.Paid ~ Employer, data = rawData_universities_split_1, las=2)
+boxplot(Salary.Paid ~ Employer, data = rawData_universities_split_2, las=2)
+boxplot(Salary.Paid ~ Employer, data = rawData_universities_split_3, las=2)
+
+
+ggplot(rawData_universities, aes(x=factor(Employer), y=Salary.Paid, fill=factor(Employer))) + geom_boxplot() + theme(axis.text.x  = element_text(angle=90, vjust=0.5))
+ggplot(rawData_universities, aes(x=factor(Employer), y=Salary.Paid, fill=factor(Employer))) + geom_boxplot() + theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + ylim(0,500000)
+
+rawData_universities$City = NA
+```
+
+## Detailed look: Brock University
+```{r}
+# Find the distribution of salaries vs roles (for Brock, e.g.)
+rawData_universities_Brock = rawData_universities[rawData_universities$Employer == "Brock University", ]
+#table(rawData_universities_Brock$Job.title)
+plot(table(rawData_universities_Brock$Job.title))
+
+ggplot(rawData_universities_Brock, aes(x=factor(Job.title), y=Salary.Paid)) + geom_boxplot() + theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + ylim(0,500000)
+
+rawData_universities_Brock_noDup = rawData_universities_Brock[(duplicated(rawData_universities_Brock$Job.title) | duplicated(rawData_universities_Brock$Job.title, fromLast = TRUE)), ]
+rawData_universities_Brock_noDup$Job.title = with(rawData_universities_Brock_noDup, reorder(Job.title, Salary.Paid, median))
+ggplot(rawData_universities_Brock_noDup, aes(x=factor(Job.title), y=Salary.Paid)) + geom_boxplot() + theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + ylim(0,500000)
+```
+
+
+#Educational cities
+```{r}
+# Create the table condensing down to school
+table(rawData_universities$Employer)
+
+summary_university = setDT(rawData_universities)[, list(Median.Salary = median(Salary.Paid)), by=Employer]
+# Refactor next line by putting city in whole dataframe, then condensing down
+summary_university$City = c("Sault Ste Marie", "London", "Ste Catharines", "Ottawa", "Sudbury", "London", "London", "Thunder Bay", "Sudbury", "Hamilton",
+                            "Hamilton", "North Bay", "Sudbury", "Toronto", "Kingston", "Toronto", "Ottawa", "Waterloo", "London", "Sudbury", "Peterborough",
+                            "Toronto", "Hearst", "Ottawa", "Guelph", "Oshawa", "Toronto","Sudbury", "Toronto", "Waterloo", "London", "Windsor", "Toronto", "Waterloo",
+                            "Toronto")
+summary_city = summary_university[, list(Average.Salary = mean(Median.Salary)), by=City]
+barplot(height = summary_city$Average.Salary, names.arg = summary_city$City, las=2)
+
+rawData_universities_dt = data.table(rawData_universities)
+rawData_universities_dt$City[rawData_universities_dt$Employer == "University of Toronto" | 
+                               rawData_universities_dt$Employer == "York University" | 
+                               rawData_universities_dt$Employer == "Ryerson University" | 
+                               rawData_universities_dt$Employer == "University of St. Michael's College" | 
+                               rawData_universities_dt$Employer == "Victoria University" |
+                               rawData_universities_dt$Employer == "Ontario College of Art & Design University" |
+                               rawData_universities_dt$Employer == "Trinity College"] = "Toronto"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "University of Ottawa" |
+                               rawData_universities_dt$Employer == "Carleton University" |
+                               rawData_universities_dt$Employer == "Saint Paul University / UniversitÃ© Saint-Paul"] = "Ottawa"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "University of Western Ontario" |
+                               rawData_universities_dt$Employer == "Brescia University College" |
+                               rawData_universities_dt$Employer == "Huron University College" | 
+                               rawData_universities_dt$Employer == "King's University College" | 
+                               rawData_universities_dt$Employer == "St. Peter's Seminary"] = "London"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "Algoma University"] = "Sault Ste Marie"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "Brock University"] = "Ste Catharines"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "Huntington University" | 
+                               rawData_universities_dt$Employer == "Laurentian University of Sudbury" | 
+                               rawData_universities_dt$Employer == "Northern Ontario School of Medicine" |
+                               rawData_universities_dt$Employer == "Thorneloe University" |
+                               rawData_universities_dt$Employer == "University of Sudbury"] = "Sudbury"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "Lakehead University"] = "Thunder Bay"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "McMaster University" |
+                               rawData_universities_dt$Employer == "McMaster Divinity College"] = "Hamilton"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "Nipissing University"] = "North Bay"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "Queen's University"] = "Kingston"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "University of Guelph"] = "Guelph"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "UniversitÃ© de Hearst"] = "Hearst"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "University of Ontario Institute of Technology"] = "Oshawa"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "Trent University"] = "Peterborough"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "St. Jerome's University" |
+                               rawData_universities_dt$Employer == "University of Waterloo" |
+                               rawData_universities_dt$Employer == "Wilfrid Laurier University"] = "Waterloo"
+rawData_universities_dt$City[rawData_universities_dt$Employer == "University of Windsor"] = "Windsor"
+summary_city = rawData_universities_dt[, list(Median.Salary = median(Salary.Paid)), by=City]
+summary_city = summary_city[order(Median.Salary)]
+barplot(height = summary_city$Median.Salary, names.arg = summary_city$City, las=2, ylab = "Median Salary for City ($)")
+rawData_universities_dt$City = with(rawData_universities_dt, reorder(City, Salary.Paid, median))
+city_vs_salary_plot = ggplot(rawData_universities_dt, aes(x=factor(City), y=Salary.Paid, fill=factor(City)))+ geom_boxplot() + theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + ylim(0,500000) + xlab("City") + ylab("Salary Paid") + ggtitle("Distribution of salaries for university locations")
+ggplotly(city_vs_salary_plot)
+
+
+
+# Find the cost of living for city and plot against median salary for university
+
+
+# Find the tuition for school and plot against median salary for university
+
+
+# Find the school's ranking and plot against median salary for university
+```
+
+# By year - Universities
+```{r}
+years = seq(2001, 2015, by=1)
+if(F){
+  data_list = list()
+  for (i in 1:length(years)){
+    data_list[[i]] = read.csv(file.path(getwd(), "Inputs", "Salary Disclosure by year", "Curated Data", years[i], "merged_file.csv"), stringsAsFactors = F)
+    
+    data_list[[i]]$Salary.Paid = as.numeric(gsub("[$,]","", data_list[[i]]$Salary.Paid))
+    data_list[[i]]$Taxable.Benefits = as.numeric(gsub("[$,]","", data_list[[i]]$Taxable.Benefits))
+    data_list[[i]]$Total.Compensation = data_list[[i]]$Salary.Paid + data_list[[i]]$Taxable.Benefits
+    data_list[[i]] = data_list[[i]][data_list[[i]]$Sector == "Universities", ]
+    #universities only for now
+  }
+}
+
+data_total = read.csv(file.path(getwd(), "Inputs", "Salary Disclosure by year", "Curated Data", years[1], "total_file.csv"), stringsAsFactors = F)
+data_total = data_total[, c("Sector", "Last.name", "First.name", "Salary.Paid", "Taxable.Benefits", "Employer", "Job.title", "Calendar.Year")]
+for (i in 2:length(years)){
+  data_to_bind = read.csv(file.path(getwd(), "Inputs", "Salary Disclosure by year", "Curated Data", years[i], "total_file.csv"), stringsAsFactors = F)
+  data_to_bind = data_to_bind[, c("Sector", "Last.name", "First.name", "Salary.Paid", "Taxable.Benefits", "Employer", "Job.title", "Calendar.Year")]
+  data_total = rbind(data_total, data_to_bind)
+}
+
+data_total$Salary.Paid = as.numeric(gsub("[$,]","", data_total$Salary.Paid))
+data_total$Taxable.Benefits = as.numeric(gsub("[$,]","", data_total$Taxable.Benefits))
+data_total$Total.Compensation = data_total$Salary.Paid + data_total$Taxable.Benefits
+
+# Over time (entire public sectors)
+compensation_over_time_plot = ggplot(data_total, aes(x=factor(Calendar.Year), y=Total.Compensation, fill=factor(Calendar.Year))) + geom_boxplot() + theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + ylim(0,1500000) + xlab("Calendar Year") + ylab("Total Compensation") + ggtitle("Salaries over time for all sectors")
+# ggplotly(compensation_over_time_plot) 
+compensation_over_time_plot_zoomed = ggplot(data_total, aes(x=factor(Calendar.Year), y=Total.Compensation, fill=factor(Calendar.Year))) + geom_boxplot() + theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + ylim(0,1500000) +  coord_cartesian(ylim=c(0,300000)) + xlab("Calendar Year") + ylab("Total Compensation") + ggtitle("Salaries over time for all sectors")
+# ggplotly(compensation_over_time_plot_zoomed)
+
+
+# Different sectors over time
+#sectors = unique(data_total$Sector)
+sectors = c("Colleges", "Universities", "Electricity", "Hospitals", "Municipalities", "Other", "SchoolBoards", "Ministries", "Legislative")# Stick with the well curated sectors for now
+for(i in 1:length(sectors)){
+  compensation_over_time_plot = ggplot(data_total[data_total$Sector == sectors[i], ], aes(x=factor(Calendar.Year), y=Total.Compensation, fill=factor(Calendar.Year))) + geom_boxplot() + theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + ylim(0,1500000) +  coord_cartesian(ylim=c(0,300000)) + xlab("Calendar Year") + ylab("Total Compensation") + ggtitle(paste0("Salaries over time for ", sectors[i]))
+  print(compensation_over_time_plot)
+  #ggplotly(compensation_over_time_plot)
+}
+
+
+
+# data_total = data_total[data_total$Sector == "Universities", ]  # Universities only for now
+# compensation_over_time_plot = ggplot(data_total, aes(x=factor(Calendar.Year), y=Total.Compensation, fill=factor(Calendar.Year))) + geom_boxplot() + theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + ylim(0,1500000)
+# ggplotly(compensation_over_time_plot)
+
+
+for (i in 1:length(years)){
+  hist(data_total[data_total$Calendar.Year==years[i], ]$Total.Compensation, breaks = 100, xlim = c(0,300000))
+}
+
+a= hist(data_total[data_total$Calendar.Year==years[i], ]$Total.Compensation, breaks = 100, xlim = c(0,300000))
+# b = data.frame(x=a$mids, r=a$counts)
+#(b <- nls( r ~ k*exp(-1/2*(x-mu)^2/sigma^2), start=c(mu=120000,sigma=5,k=1) , data = b))
+#v <- summary(b)$parameters[,"Estimate"]
+
+```

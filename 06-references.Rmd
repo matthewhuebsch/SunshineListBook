@@ -1,0 +1,15 @@
+`r if (knitr:::is_html_output()) '# References'`
+
+
+<div class="row">
+<div class="col-sm-10">
+
+
+* [Source information](https://www.ontario.ca/page/public-sector-salary-disclosure), where Ontario publishes the salaries for public sector workers in Ontario who earn more than $100,000 per year.
+
+
+* [R](http://www.rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf), the open source language used to generate the analysis.
+
+* [R Studio](https://www.rstudio.com/), the IDE that was used to write this.
+
+* [R Markdown](http://www.rstudio.com/wp-content/uploads/2015/03/rmarkdown-reference.pdf), the rendering language to create the HTML report.
